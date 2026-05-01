@@ -3,30 +3,43 @@ import FaceScan from "../components/FaceScan";
 import FingerprintScan from "../components/FingerprintScan";
 import { caesarEncrypt } from "../utils/caesar";
 
+const API = "https://securevault-backend-production-e51b.up.railway.app";
+
 function SignUp({ setScreen }) {
   const [step, setStep] = useState(1);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleFaceDone = () => setStep(2);
   const handleFingerprintDone = () => setStep(3);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!username || !password) {
       setError("Please fill in all fields.");
       return;
     }
+    setLoading(true);
+    setError("");
     const encrypted = caesarEncrypt(password);
-    const users = JSON.parse(localStorage.getItem("users") || "{}");
-    if (users[username]) {
-      setError("Username already exists.");
-      return;
+    try {
+      const res = await fetch(`${API}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password: encrypted }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("Account created! Please log in.");
+        setScreen("landing");
+      } else {
+        setError(data.error || "Registration failed.");
+      }
+    } catch (e) {
+      setError("Cannot connect to server.");
     }
-    users[username] = { password: encrypted };
-    localStorage.setItem("users", JSON.stringify(users));
-    alert("Account created! Please log in.");
-    setScreen("landing");
+    setLoading(false);
   };
 
   return (
@@ -50,7 +63,7 @@ function SignUp({ setScreen }) {
         {step === 1 && (
           <div>
             <h2 style={styles.heading}>Scan Your Face</h2>
-            <p style={styles.sub}>Look at the camera and click Scan</p>
+            <p style={styles.sub}>Click the button to scan</p>
             <FaceScan onDone={handleFaceDone} />
           </div>
         )}
@@ -86,8 +99,12 @@ function SignUp({ setScreen }) {
               </p>
             )}
             {error && <p style={styles.error}>{error}</p>}
-            <button style={styles.btn} onClick={handleSubmit}>
-              Create Account
+            <button
+              style={{ ...styles.btn, background: loading ? "#21262d" : "#1f6feb" }}
+              onClick={handleSubmit}
+              disabled={loading}
+            >
+              {loading ? "Creating..." : "Create Account"}
             </button>
           </div>
         )}
@@ -112,7 +129,7 @@ const styles = {
   input: { width: "100%", padding: "10px 12px", background: "#0d1117", border: "1px solid #30363d", borderRadius: 8, color: "#e6edf3", fontSize: 14, marginBottom: 12, boxSizing: "border-box" },
   cipher: { color: "#8b949e", fontSize: 12, marginBottom: 12 },
   error: { color: "#f85149", fontSize: 13, marginBottom: 12 },
-  btn: { width: "100%", padding: "11px 0", background: "#1f6feb", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer", marginBottom: 12 },
+  btn: { width: "100%", padding: "11px 0", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer", marginBottom: 12 },
   back: { background: "none", border: "none", color: "#8b949e", fontSize: 13, cursor: "pointer", marginTop: 8 },
 };
 

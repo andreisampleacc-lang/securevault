@@ -3,25 +3,35 @@ import FaceScan from "../components/FaceScan";
 import FingerprintScan from "../components/FingerprintScan";
 import { caesarEncrypt } from "../utils/caesar";
 
+const API = "https://securevault-backend-production-e51b.up.railway.app";
+
 function Login({ setScreen, setCurrentUser }) {
   const [step, setStep] = useState(1);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleCredentials = () => {
+  const handleCredentials = async () => {
     setError("");
-    const users = JSON.parse(localStorage.getItem("users") || "{}");
-    if (!users[username]) {
-      setError("Username not found.");
-      return;
-    }
+    setLoading(true);
     const encrypted = caesarEncrypt(password);
-    if (users[username].password !== encrypted) {
-      setError("Wrong password.");
-      return;
+    try {
+      const res = await fetch(`${API}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password: encrypted }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStep(2);
+      } else {
+        setError(data.error || "Invalid credentials.");
+      }
+    } catch (e) {
+      setError("Cannot connect to server.");
     }
-    setStep(2);
+    setLoading(false);
   };
 
   const handleFaceDone = () => setStep(3);
@@ -67,8 +77,12 @@ function Login({ setScreen, setCurrentUser }) {
               onChange={(e) => setPassword(e.target.value)}
             />
             {error && <p style={styles.error}>{error}</p>}
-            <button style={styles.btn} onClick={handleCredentials}>
-              Continue →
+            <button
+              style={{ ...styles.btn, background: loading ? "#21262d" : "#1f6feb" }}
+              onClick={handleCredentials}
+              disabled={loading}
+            >
+              {loading ? "Checking..." : "Continue →"}
             </button>
           </div>
         )}
@@ -76,7 +90,7 @@ function Login({ setScreen, setCurrentUser }) {
         {step === 2 && (
           <div>
             <h2 style={styles.heading}>Face Recognition</h2>
-            <p style={styles.sub}>Look at the camera and click Scan</p>
+            <p style={styles.sub}>Click the button to scan</p>
             <FaceScan onDone={handleFaceDone} />
           </div>
         )}
@@ -108,7 +122,7 @@ const styles = {
   sub: { color: "#8b949e", fontSize: 13, textAlign: "center", marginBottom: 20 },
   input: { width: "100%", padding: "10px 12px", background: "#0d1117", border: "1px solid #30363d", borderRadius: 8, color: "#e6edf3", fontSize: 14, marginBottom: 12, boxSizing: "border-box" },
   error: { color: "#f85149", fontSize: 13, marginBottom: 12 },
-  btn: { width: "100%", padding: "11px 0", background: "#1f6feb", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer", marginBottom: 12 },
+  btn: { width: "100%", padding: "11px 0", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer", marginBottom: 12 },
   back: { background: "none", border: "none", color: "#8b949e", fontSize: 13, cursor: "pointer", marginTop: 8 },
 };
 
