@@ -14,16 +14,18 @@ function FaceScan({ onDone, mode = "signup", savedDescriptor = null }) {
 
   const loadModels = async () => {
     try {
-      setMessage("Loading models...");
+      setMessage("Loading model 1/3...");
       await faceapi.nets.tinyFaceDetector.loadFromUri("/models");
+      setMessage("Loading model 2/3...");
       await faceapi.nets.faceRecognitionNet.loadFromUri("/models");
+      setMessage("Loading model 3/3...");
       await faceapi.nets.faceLandmark68Net.loadFromUri("/models");
       setStatus("ready");
       setMessage("Click Scan to start");
       startCamera();
     } catch (err) {
       setStatus("error");
-      setMessage("Failed to load models");
+      setMessage("Failed: " + err.message);
     }
   };
 
@@ -68,14 +70,12 @@ function FaceScan({ onDone, mode = "signup", savedDescriptor = null }) {
           const descriptor = Array.from(detection.descriptor);
 
           if (mode === "signup") {
-            // Save descriptor and pass to parent
             setStatus("success");
             setMessage("Face captured!");
             stopCamera();
             setTimeout(() => onDone(descriptor), 1000);
 
           } else if (mode === "login") {
-            // Compare with saved descriptor
             if (!savedDescriptor) {
               setStatus("success");
               setMessage("Face verified!");
