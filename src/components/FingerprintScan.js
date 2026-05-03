@@ -20,7 +20,6 @@ function FingerprintScan({ onDone, mode = "signup" }) {
         window.crypto.getRandomValues(challenge);
 
         if (mode === "signup") {
-          // Register new fingerprint
           const credential = await navigator.credentials.create({
             publicKey: {
               challenge,
@@ -42,10 +41,11 @@ function FingerprintScan({ onDone, mode = "signup" }) {
             },
           });
 
-          // Save credential ID
           const credentialId = btoa(
             String.fromCharCode(...new Uint8Array(credential.rawId))
           );
+
+          localStorage.setItem("credentialId", credentialId);
 
           setProgress(100);
           setStatus("success");
@@ -53,25 +53,27 @@ function FingerprintScan({ onDone, mode = "signup" }) {
           setTimeout(() => onDone(credentialId), 1000);
 
         } else {
-          // Verify existing fingerprint
-          const credentialId = localStorage.getItem("credentialId");
+          // Login mode — use exact credential from DB
+          const credId = localStorage.getItem("credentialId");
 
-          const assertionOptions = {
-            challenge,
-            timeout: 60000,
-            userVerification: "required",
-          };
-
-          if (credentialId) {
-            const rawId = Uint8Array.from(atob(credentialId), c => c.charCodeAt(0));
-            assertionOptions.allowCredentials = [{
-              type: "public-key",
-              id: rawId,
-            }];
+          if (!credId || credId === "simulated") {
+            simulateScan();
+            return;
           }
 
+          const rawId = Uint8Array.from(atob(credId), c => c.charCodeAt(0));
+
           await navigator.credentials.get({
-            publicKey: assertionOptions,
+            publicKey: {
+              challenge,
+              timeout: 60000,
+              userVerification: "required",
+              allowCredentials: [{
+                type: "public-key",
+                id: rawId,
+                transports: ["internal"],
+              }],
+            },
           });
 
           setProgress(100);
@@ -83,9 +85,8 @@ function FingerprintScan({ onDone, mode = "signup" }) {
       } catch (err) {
         if (err.name === "NotAllowedError") {
           setStatus("ready");
-          setMessage("Cancelled. Try again.");
+          setMessage("Wrong fingerprint! Try again.");
         } else {
-          // Fallback to simulation
           simulateScan();
         }
       }
