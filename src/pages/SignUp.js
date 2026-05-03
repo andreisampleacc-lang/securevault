@@ -3,7 +3,7 @@ import FaceScan from "../components/FaceScan";
 import FingerprintScan from "../components/FingerprintScan";
 import { caesarEncrypt } from "../utils/caesar";
 
-const API = "https://securevault-backend-production-e51b.up.railway.app";
+const API = "https://securevault-backend-production-4fb1.up.railway.app";
 
 function SignUp({ setScreen }) {
   const [step, setStep] = useState(1);
