@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as faceapi from "face-api.js";
 
-function FaceScan({ onDone }) {
+function FaceScan({ onDone, mode = "signup", savedDescriptor = null }) {
   const videoRef = useRef(null);
   const [status, setStatus] = useState("loading");
   const [stream, setStream] = useState(null);
@@ -14,8 +14,10 @@ function FaceScan({ onDone }) {
 
   const loadModels = async () => {
     try {
-      setMessage("Loading face detection models...");
+      setMessage("Loading models...");
       await faceapi.nets.tinyFaceDetector.loadFromUri("/models");
+      await faceapi.nets.faceRecognitionNet.loadFromUri("/models");
+      await faceapi.nets.faceLandmark68Net.loadFromUri("/models");
       setStatus("ready");
       setMessage("Click Scan to start");
       startCamera();
@@ -47,20 +49,55 @@ function FaceScan({ onDone }) {
     setMessage("Detecting face... Hold still!");
 
     let attempts = 0;
-    const maxAttempts = 10;
+    const maxAttempts = 15;
 
     const detect = async () => {
       try {
-        const detection = await faceapi.detectSingleFace(
-          videoRef.current,
-          new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 })
-        );
+        const detection = await faceapi
+          .detectSingleFace(
+            videoRef.current,
+            new faceapi.TinyFaceDetectorOptions({
+              inputSize: 224,
+              scoreThreshold: 0.3,
+            })
+          )
+          .withFaceLandmarks()
+          .withFaceDescriptor();
 
         if (detection) {
-          setStatus("success");
-          setMessage("Face detected!");
-          stopCamera();
-          setTimeout(() => onDone(), 1000);
+          const descriptor = Array.from(detection.descriptor);
+
+          if (mode === "signup") {
+            // Save descriptor and pass to parent
+            setStatus("success");
+            setMessage("Face captured!");
+            stopCamera();
+            setTimeout(() => onDone(descriptor), 1000);
+
+          } else if (mode === "login") {
+            // Compare with saved descriptor
+            if (!savedDescriptor) {
+              setStatus("success");
+              setMessage("Face verified!");
+              stopCamera();
+              setTimeout(() => onDone(true), 1000);
+              return;
+            }
+
+            const saved = new Float32Array(Object.values(savedDescriptor));
+            const current = new Float32Array(descriptor);
+            const distance = faceapi.euclideanDistance(saved, current);
+
+            if (distance < 0.5) {
+              setStatus("success");
+              setMessage("Face matched! ✓");
+              stopCamera();
+              setTimeout(() => onDone(true), 1000);
+            } else {
+              setStatus("ready");
+              setMessage("Face not matched! Try again.");
+            }
+          }
         } else {
           attempts++;
           if (attempts < maxAttempts) {
@@ -116,19 +153,13 @@ function FaceScan({ onDone }) {
 
       {status === "ready" && (
         <button style={styles.btn} onClick={handleScan}>
-          Scan Face
+          {mode === "signup" ? "Scan Face" : "Verify Face"}
         </button>
       )}
 
-      {status === "loading" && (
+      {(status === "loading" || status === "scanning") && (
         <button style={{ ...styles.btn, background: "#21262d", cursor: "not-allowed" }} disabled>
-          Loading...
-        </button>
-      )}
-
-      {status === "scanning" && (
-        <button style={{ ...styles.btn, background: "#21262d", cursor: "not-allowed" }} disabled>
-          Detecting...
+          {status === "loading" ? "Loading..." : "Detecting..."}
         </button>
       )}
 
