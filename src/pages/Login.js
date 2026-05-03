@@ -11,11 +11,13 @@ function Login({ setScreen, setCurrentUser }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [faceDescriptor, setFaceDescriptor] = useState(null);
 
   const handleCredentials = async () => {
     setError("");
     setLoading(true);
     const encrypted = caesarEncrypt(password);
+
     try {
       const res = await fetch(`${API}/login`, {
         method: "POST",
@@ -23,7 +25,15 @@ function Login({ setScreen, setCurrentUser }) {
         body: JSON.stringify({ username, password: encrypted }),
       });
       const data = await res.json();
+
       if (data.success) {
+        // Save face descriptor and credential ID for verification
+        if (data.face_descriptor) {
+          setFaceDescriptor(data.face_descriptor);
+        }
+        if (data.credential_id) {
+          localStorage.setItem("credentialId", data.credential_id);
+        }
         setStep(2);
       } else {
         setError(data.error || "Invalid credentials.");
@@ -34,11 +44,19 @@ function Login({ setScreen, setCurrentUser }) {
     setLoading(false);
   };
 
-  const handleFaceDone = () => setStep(3);
+  const handleFaceDone = (result) => {
+    if (result === true || result) {
+      setStep(3);
+    } else {
+      setStep(2);
+    }
+  };
 
-  const handleFingerprintDone = () => {
-    setCurrentUser(username);
-    setScreen("dashboard");
+  const handleFingerprintDone = (result) => {
+    if (result) {
+      setCurrentUser(username);
+      setScreen("dashboard");
+    }
   };
 
   return (
@@ -90,16 +108,23 @@ function Login({ setScreen, setCurrentUser }) {
         {step === 2 && (
           <div>
             <h2 style={styles.heading}>Face Recognition</h2>
-            <p style={styles.sub}>Click the button to scan</p>
-            <FaceScan onDone={handleFaceDone} />
+            <p style={styles.sub}>Verify your face</p>
+            <FaceScan
+              onDone={handleFaceDone}
+              mode="login"
+              savedDescriptor={faceDescriptor}
+            />
           </div>
         )}
 
         {step === 3 && (
           <div>
             <h2 style={styles.heading}>Fingerprint Scan</h2>
-            <p style={styles.sub}>Use your device biometrics</p>
-            <FingerprintScan onDone={handleFingerprintDone} />
+            <p style={styles.sub}>Verify your fingerprint</p>
+            <FingerprintScan
+              onDone={handleFingerprintDone}
+              mode="login"
+            />
           </div>
         )}
 

@@ -11,9 +11,22 @@ function SignUp({ setScreen }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [faceDescriptor, setFaceDescriptor] = useState(null);
+  const [credentialId, setCredentialId] = useState(null);
 
-  const handleFaceDone = () => setStep(2);
-  const handleFingerprintDone = () => setStep(3);
+  const handleFaceDone = (descriptor) => {
+    setFaceDescriptor(descriptor);
+    setStep(2);
+  };
+
+  const handleFingerprintDone = (credId) => {
+    setCredentialId(credId);
+    // Save credential ID to localStorage for login verification
+    if (credId && credId !== "simulated") {
+      localStorage.setItem("credentialId", credId);
+    }
+    setStep(3);
+  };
 
   const handleSubmit = async () => {
     if (!username || !password) {
@@ -23,11 +36,17 @@ function SignUp({ setScreen }) {
     setLoading(true);
     setError("");
     const encrypted = caesarEncrypt(password);
+
     try {
       const res = await fetch(`${API}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password: encrypted }),
+        body: JSON.stringify({
+          username,
+          password: encrypted,
+          face_descriptor: faceDescriptor,
+          credential_id: credentialId,
+        }),
       });
       const data = await res.json();
       if (data.success) {
@@ -63,16 +82,16 @@ function SignUp({ setScreen }) {
         {step === 1 && (
           <div>
             <h2 style={styles.heading}>Scan Your Face</h2>
-            <p style={styles.sub}>Click the button to scan</p>
-            <FaceScan onDone={handleFaceDone} />
+            <p style={styles.sub}>Position your face in the camera</p>
+            <FaceScan onDone={handleFaceDone} mode="signup" />
           </div>
         )}
 
         {step === 2 && (
           <div>
-            <h2 style={styles.heading}>Scan Fingerprint</h2>
+            <h2 style={styles.heading}>Register Fingerprint</h2>
             <p style={styles.sub}>Use your device biometrics</p>
-            <FingerprintScan onDone={handleFingerprintDone} />
+            <FingerprintScan onDone={handleFingerprintDone} mode="signup" />
           </div>
         )}
 
