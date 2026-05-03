@@ -44,27 +44,40 @@ function FaceScan({ onDone }) {
 
   const handleScan = async () => {
     setStatus("scanning");
-    setMessage("Detecting face...");
+    setMessage("Detecting face... Hold still!");
 
-    try {
-      const detection = await faceapi.detectSingleFace(
-        videoRef.current,
-        new faceapi.TinyFaceDetectorOptions()
-      );
+    let attempts = 0;
+    const maxAttempts = 10;
 
-      if (detection) {
-        setStatus("success");
-        setMessage("Face detected!");
-        stopCamera();
-        setTimeout(() => onDone(), 1000);
-      } else {
+    const detect = async () => {
+      try {
+        const detection = await faceapi.detectSingleFace(
+          videoRef.current,
+          new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 })
+        );
+
+        if (detection) {
+          setStatus("success");
+          setMessage("Face detected!");
+          stopCamera();
+          setTimeout(() => onDone(), 1000);
+        } else {
+          attempts++;
+          if (attempts < maxAttempts) {
+            setMessage(`Detecting... (${attempts}/${maxAttempts})`);
+            setTimeout(detect, 500);
+          } else {
+            setStatus("ready");
+            setMessage("No face detected. Try again!");
+          }
+        }
+      } catch (err) {
         setStatus("ready");
-        setMessage("No face detected. Try again!");
+        setMessage("Detection failed. Try again!");
       }
-    } catch (err) {
-      setStatus("ready");
-      setMessage("Detection failed. Try again!");
-    }
+    };
+
+    detect();
   };
 
   return (
@@ -101,7 +114,7 @@ function FaceScan({ onDone }) {
         {message}
       </p>
 
-      {(status === "ready") && (
+      {status === "ready" && (
         <button style={styles.btn} onClick={handleScan}>
           Scan Face
         </button>
